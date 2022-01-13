@@ -1,0 +1,124 @@
+# Load libraries
+library(gdxrrw)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(RColorBrewer)
+library(readxl)
+library(rgdal)
+library(raster)
+library(maptools)
+library(rgeos)
+library(sf)
+library(sp)
+
+igdx("C:/GAMS/win64/31.2/")
+
+########################
+### GLOBIOM results
+# Import land cover data
+# Land 1'641,474 obs., class data.frame
+
+globiom_path <- "C:/Users/fherrera/Desktop/GLOBIOM/GLOBIOM/Model/gdx"
+file <- file.path(globiom_path,
+                  "a6_SSP2_BAU.gdx")
+
+Land <- rgdx.param(file,"Land_Compare3") %>%
+  setNames(c("Country","ColRow","Altitude",
+             "Slope","Soil","AEZ","Land_cover",
+             "MacroScen","BioenScen","IEAScen",
+             "Year","Value")) %>%
+  mutate(Year = as.integer(as.character(Year))) %>%
+  droplevels
+  
+# Filter by country, cover (PriFor and MngFor) and year 2000
+# PriFor is primary forest, MngFor is managed forest
+# AEZ_forest 985 obs., class data.frame
+
+forest_types <- c('PriFor','MngFor','G4MAFR')
+AEZ_forest <- Land %>%
+  filter(Country == "Mexico" &
+           Land_cover %in% forest_types & Year == 2000)
+           
+# 'Collapse' by AEZ values
+# forest 671 obs., class data.frame
+
+forest <- AEZ_forest %>%
+  group_by(Country, ColRow, Altitude, Slope, Soil) %>%
+  dplyr::summarize(Forest = sum(Value)) %>%
+  as.data.frame()
+  
+### Import SimU (ColRow + HRU) and CR list
+# ColRow: 50x50 km grid 
+# HRU: clusters of 5 arcmin pixels by altitude, slope and soil
+# SimuList 425,414 obs., class data.frame
+
+SimuList <- rgdx.set(file,"SimUIDLUIDHRU_map") %>%
+  setNames(c("SimUID","Country","ColRow",
+             "Altitude","Slope","Soil")) %>%
+  droplevels
+  
+# Filter by country
+# SimuMEX 3,718 obs., class data.frame
+SimuMEX <- SimuList %>%
+  filter(Country == "Mexico")
+SimuMEX <- SimuMEX[!(SimuMEX$Altitude == "Alti_Any" &
+                       SimuMEX$Slope == "Slp_Any" &
+                       SimuMEX$Soil == "Soil_Any"),]
+length(unique(SimuMEX$SimUID))
+ 
+# 'Collapse' by LU and HRU
+# SimuMEX$Value = 1
+# Simus <- SimuMEX %>%
+#  group_by(Country, ColRow, Altitude, Slope, Soil) %>%
+#  dplyr::summarize(Value = sum(Value)) %>%
+#  as.data.frame()
+
+# Add SimU ID by merging ColRow + HRU and forest values
+# forest_ID 2,514 obs., class data.frame
+forest_ID <-merge(forest, SimuMEX,
+      by.x = c("ColRow", "Altitude", "Slope", "Soil"),
+      by.y = c("ColRow", "Altitude", "Slope", "Soil"))
+      
+###########################
+###  SIMU Map
+# Obs: Package "rgeos" must be installed
+
+# Import SIMU map 
+# SimU 6,046 obs., class sf data.frame
+setwd("C:/Users/fherrera/Desktop/Espacial/Shapes")
+SimU <- st_read("MexicoSimU.shp")
+
+# Merge Forest and SIMU map data
+# forest_Simu 4,103 obs., class data.frame
+forest_Simu <-merge(forest_ID, SimU,
+                  by.x = c("SimUID"),
+                  by.y = c("ID"))
+                  
+forest_Simu <- forest_Simu[,-8]
+forest_Simu <- forest_Simu[,c(6,2,9,3,4,5,1,8,7,10)]
+names(forest_Simu)[1] <- 'Country'
+names(forest_Simu)[2] <- 'LU'
+names(forest_Simu)[3] <- 'ColRow'
+
+# Trasform forest_Simu into spatial polygon
+# df 4,103 obs., class sf data.frame
+# df_sp 4,103 obs., class SpatialPolygonsDataFrame
+df <- st_as_sf(forest_Simu)
+df_sp <- sf:::as_Spatial(df)
+
+# Plot only Forest attribute
+# cran.r-project.org/web/packages/sf/vignettes/sf5.html
+
+ggplot() +
+  labs(title = "Land cover with areas of forest", subtitle = "SSP2, year 2000") +
+  geom_sf(data = df, aes(fill = Forest)) +
+  scale_fill_distiller(name = "Forest (1000 ha)",
+                       palette = "YlGn",
+                       direction = 0) +
+  theme_void()
+
+ggsave("Forest_SSP2_2000.png",
+       path = "C:/Users/fherrera/Desktop/Espacial/Graphs",
+       width = 14, height = 9, units = "cm",
+       dpi = 120)
