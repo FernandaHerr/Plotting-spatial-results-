@@ -167,3 +167,7 @@ ggplot() +
                fill = NA, color = "black", size = .2) +
   theme_void()
 
+ggsave("Forest_SSP2_2000.png",
+       path = "C:/Users/fherrera/Desktop/Espacial/Graphs",
+       width = 14, height = 9, units = "cm",
+       dpi = 120)
