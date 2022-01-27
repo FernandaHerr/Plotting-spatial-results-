@@ -102,24 +102,61 @@ names(forest_Simu)[1] <- 'Country'
 names(forest_Simu)[2] <- 'LU'
 names(forest_Simu)[3] <- 'ColRow'
 
-# Trasform forest_Simu into spatial polygon
-# df 4,103 obs., class sf data.frame
-# df_sp 4,103 obs., class SpatialPolygonsDataFrame
-df <- st_as_sf(forest_Simu)
-df_sp <- sf:::as_Spatial(df)
+# Find out which Simus were 'lost' in the initial land cover
+diff <- setdiff(SimU$ID, forest_ID$SimUID) 
+diff.matrix = matrix(data = diff, ncol = 1, byrow = TRUE)
+diff.df = as.data.frame(diff.matrix)
+names(diff.df)[1] <- 'ID'
+diff_ID <-merge(diff.df, SimU,
+                    by.x = c("ID"),
+                    by.y = c("ID"))
+# Convert data frame into spatial polygons to dissolve by ID
+# Plot (using n= 6 colors)
+diff_sf <- st_as_sf(diff_ID)
+diff_sp <- sf:::as_Spatial(diff_sf)
+diff_diss <- unionSpatialPolygons(diff_sp, diff_sp@data$ID)
+plot(diff_diss, col = rainbow(6))
+
+###############
+# Plot
+###############
+
+# Plot using tmap
+# https://crd230.github.io/lab3.html
+# Obs: for this to work, sp version must be 0.9.8
+# to install: install_version("sf", version = "0.9.8")
+
+# tm_shape(forest_sp) +
+#  tm_polygons(col = "Forest", style = "quantile",
+#              border.alpha = 0)
 
 # Plot only Forest attribute
 # cran.r-project.org/web/packages/sf/vignettes/sf5.html
+# Key pos: 1 below, 2 left, 3 above, 4 right
+# plot(df["Forest"], key.pos = 4, key.width = lcm(1.4),
+#     key.length = 0.85, breaks = "pretty")
+
+# Plot using geo_sf
+# Obs.: Mexican state borders obtained from Diego Valle
+# https://www.diegovalle.net/mxmaps/
+# Requieres installing mxmaps 
+# devtools::install_github("diegovalle/mxmaps")
+
+# Trasform forest_Simu into spatial polygon
+df <- st_as_sf(forest_Simu)
+forest_sp <- sf:::as_Spatial(df)
+
+library("mxmaps")
+data(mxstate.map)
 
 ggplot() +
-  labs(title = "Land cover with areas of forest", subtitle = "SSP2, year 2000") +
-  geom_sf(data = df, aes(fill = Forest)) +
+  labs(title = "Land cover with areas of forest",
+       subtitle = "SSP2, year 2000") +
+  geom_sf(data = df, aes(fill = Forest), colour = NA) +
   scale_fill_distiller(name = "Forest (1000 ha)",
-                       palette = "YlGn",
+                       palette = "Set3",
                        direction = 0) +
+  geom_polygon(data = mxstate.map, aes(long, lat, group=group),
+               fill = NA, color = "black", size = .2) +
   theme_void()
 
-ggsave("Forest_SSP2_2000.png",
-       path = "C:/Users/fherrera/Desktop/Espacial/Graphs",
-       width = 14, height = 9, units = "cm",
-       dpi = 120)
