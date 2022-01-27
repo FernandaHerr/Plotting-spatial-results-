@@ -103,15 +103,22 @@ names(forest_Simu)[2] <- 'LU'
 names(forest_Simu)[3] <- 'ColRow'
 
 # Find out which Simus were 'lost' in the initial land cover
+# diff.df 296 obs., class data.frame
 diff <- setdiff(SimU$ID, forest_ID$SimUID) 
 diff.matrix = matrix(data = diff, ncol = 1, byrow = TRUE)
 diff.df = as.data.frame(diff.matrix)
 names(diff.df)[1] <- 'ID'
+
 diff_ID <-merge(diff.df, SimU,
                     by.x = c("ID"),
                     by.y = c("ID"))
+
 # Convert data frame into spatial polygons to dissolve by ID
+# diff_ID (diff_sf) 459 obs., class data.frame (SpatialPolygonsDataFrame)
 # Plot (using n= 6 colors)
+diff_ID <-merge(diff.df, SimU,
+                by.x = c("ID"),
+                by.y = c("ID"))
 diff_sf <- st_as_sf(diff_ID)
 diff_sp <- sf:::as_Spatial(diff_sf)
 diff_diss <- unionSpatialPolygons(diff_sp, diff_sp@data$ID)
