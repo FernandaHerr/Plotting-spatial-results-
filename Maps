@@ -159,9 +159,9 @@ data(mxstate.map)
 ggplot() +
   labs(title = "Land cover with areas of forest",
        subtitle = "SSP2, year 2000") +
-  geom_sf(data = df, aes(fill = Forest), colour = NA) +
+  geom_sf(data = forest_df, aes(fill = Forest), colour = NA) +
   scale_fill_distiller(name = "Forest (1000 ha)",
-                       palette = "Set3",
+                       palette = "Greens",
                        direction = 0) +
   geom_polygon(data = mxstate.map, aes(long, lat, group=group),
                fill = NA, color = "black", size = .2) +
