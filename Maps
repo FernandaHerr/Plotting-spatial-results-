@@ -125,7 +125,7 @@ diff_diss <- unionSpatialPolygons(diff_sp, diff_sp@data$ID)
 plot(diff_diss, col = rainbow(6))
 
 ###############
-# Plot
+# Plotting land cover (single case)
 ###############
 
 # Plot using tmap
@@ -159,6 +159,7 @@ data(mxstate.map)
 ggplot() +
   labs(title = "Land cover with areas of forest",
        subtitle = "SSP2, year 2000") +
+  geom_sf(data =diff_sf, fill = "black", colour = NA) +
   geom_sf(data = forest_df, aes(fill = Forest), colour = NA) +
   scale_fill_distiller(name = "Forest (1000 ha)",
                        palette = "Greens",
