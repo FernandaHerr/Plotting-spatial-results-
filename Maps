@@ -122,7 +122,7 @@ diff_ID <-merge(diff.df, SimU,
 diff_sf <- st_as_sf(diff_ID)
 diff_sp <- sf:::as_Spatial(diff_sf)
 diff_diss <- unionSpatialPolygons(diff_sp, diff_sp@data$ID)
-plot(diff_diss, col = rainbow(6))
+# plot(diff_diss, col = rainbow(6))
 
 ###############
 # Plotting land cover (single case)
@@ -169,6 +169,96 @@ ggplot() +
   theme_void()
 
 ggsave("Forest_SSP2_2000.png",
+       path = "C:/Users/fherrera/Desktop/Espacial/Graphs",
+       width = 14, height = 9, units = "cm",
+       dpi = 120)
+
+###############
+# Plot differences
+###############
+
+# Import merged scenarios file
+# Land_merged 3'283,122 obs., class data.frame
+path <- "C:/Users/fherrera/Desktop/Merged_files"
+diff_file <- file.path(path,"SSP2_merged.gdx")
+
+Land_merged <- rgdx.param(diff_file,"Land_Compare3") %>%
+  setNames(c("Scenario","Country","ColRow","Altitude",
+             "Slope","Soil","AEZ","Land_cover",
+             "MacroScen","BioenScen","IEAScen",
+             "Year","Value")) %>%
+  mutate(Year = as.integer(as.character(Year))) %>%
+  droplevels
+
+# Filter by country, cover (PriFor and MngFor) and year 2050 
+# PriFor is primary forest, MngFor is managed forest
+# Merged_scenarios 2,987 obs., class data.frame
+forest_types <- c('PriFor','MngFor','G4MAFR')
+Merged_scenarios <- Land_merged %>%
+  filter(Country == "Mexico" &
+           Land_cover %in% forest_types & Year == 2050)
+           
+# 'Collapse' by AEZ values 
+# forest_merged 1,910 obs., class data.frame
+forest_merged <- Merged_scenarios %>%
+  group_by(Scenario, Country, ColRow, Altitude, Slope, Soil) %>%
+  dplyr::summarize(Forest = sum(Value)) %>%
+  as.data.frame()
+  
+# Extract forest values of baseline
+# baseline 952 obs., class data.frame
+baseline <- forest_merged %>%
+  filter(Scenario == "a6_SSP2_BAU") %>%
+  dplyr::select(-c(Scenario, Country)) %>%
+  rename(Value_baseline = Forest)
+  
+# Remove baseline from fores_merged and then join baseline to
+# the rest of the scenario
+# diffBase 958 obs., class data.frame
+diffBase <- forest_merged %>%
+  filter(Scenario != "a6_SSP2_BAU") %>%
+  left_join(baseline, by = c("ColRow" = "ColRow",
+                             "Altitude" = "Altitude",
+                             "Slope" = "Slope",
+                             "Soil" ="Soil")) %>%
+  mutate(Forest_baseDiff = Forest - Value_baseline)
+  
+# Add SimU ID by merging ColRow + HRU
+# diffBase_ID 3,419 obs., class data.frame
+diffBase_ID <-merge(diffBase, SimuMEX,
+                  by.x = c("ColRow", "Altitude", "Slope", "Soil"),
+                  by.y = c("ColRow", "Altitude", "Slope", "Soil"))
+                  
+# Merge difference data and SIMU map data
+# diffBase_Simu 5,584 obs., class data.frame
+diffBase_Simu <-merge(diffBase_ID, SimU,
+                    by.x = c("SimUID"),
+                    by.y = c("ID"))
+
+diffBase_Simu <- diffBase_Simu[,-c(11,13)]
+diffBase_Simu <- diffBase_Simu[,c(7,2,3,4,5,1,11,6,8,9,10,12)]
+names(diffBase_Simu)[1] <- 'Country'
+names(diffBase_Simu)[2] <- 'ColRow'
+names(diffBase_Simu)[11] <- 'Difference'
+
+# Transform into spatial polygon
+# diffBase_df 5,584 obs., class data.frame
+# diffBase_sp 5,584 obs., class SpatialPolygonsDataFrame
+diffBase_df <- st_as_sf(diffBase_Simu)
+diffBase_sp <- sf:::as_Spatial(diffBase_df)
+
+ggplot() +
+  labs(title = "Difference in areas of forest",
+       subtitle = "SSP2 baseline vs. healthy diet, year 2050") +
+  geom_sf(data = diffBase_df, aes(fill = Difference), colour = NA) +
+  scale_fill_distiller(name = "Forest (1000 ha)",
+                       palette = "RdBu",
+                       direction = 0) +
+  geom_polygon(data = mxstate.map, aes(long, lat, group=group),
+               fill = NA, color = "black", size = .2) +
+  theme_void()
+  
+  ggsave("Forest_difference_2050.png",
        path = "C:/Users/fherrera/Desktop/Espacial/Graphs",
        width = 14, height = 9, units = "cm",
        dpi = 120)
